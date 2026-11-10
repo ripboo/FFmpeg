@@ -1,0 +1,58 @@
+name: Build FFmpeg for Android ARMv7
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout FFmpeg Source
+        uses: actions/checkout@v4
+        with:
+          repository: 'FFmpeg/FFmpeg'
+          ref: 'release/9.0'
+
+      - name: Install Build Tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config yasm nasm git
+
+      - name: Configure and Compile for ARMv7
+        run: |
+          export NDK=$ANDROID_NDK_HOME
+          TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
+          API=21
+          TARGET=armv7a-linux-androideabi
+          
+          export AR=$TOOLCHAIN/bin/llvm-ar
+          export CC=$TOOLCHAIN/bin/$TARGET$API-clang
+          export CXX=$TOOLCHAIN/bin/$TARGET$API-clang++
+          export LD=$TOOLCHAIN/bin/ld
+          export RANLIB=$TOOLCHAIN/bin/llvm-ranlib
+          export STRIP=$TOOLCHAIN/bin/llvm-strip
+
+          ./configure \
+            --target-os=android \
+            --arch=arm \
+            --cpu=armv7-a \
+            --enable-cross-compile \
+            --cc="$CC" \
+            --ar="$AR" \
+            --ranlib="$RANLIB" \
+            --strip="$STRIP" \
+            --enable-gpl \
+            --enable-version3 \
+            --disable-doc \
+            --disable-vulkan \
+            --extra-cflags="-Wno-error=incompatible-function-pointer-types" \
+            --prefix=./android/armv7
+
+          make -j$(nproc)
+          make install
+
+      - name: Upload FFmpeg Binary Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffmpeg-armv7-android
+          path: ./android/armv7/bin/ffmpeg
